@@ -7,7 +7,6 @@ import javax.ws.rs.core.HttpHeaders;
 import org.absit.integrasjon.dto.api.RequestDto;
 import org.absit.integrasjon.dto.api.ResponseDto;
 import org.apache.camel.Exchange;
-import org.apache.camel.ExchangePattern;
 import org.apache.camel.LoggingLevel;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.model.rest.RestBindingMode;
@@ -40,11 +39,10 @@ public class ApiRoutes extends RouteBuilder {
         rest("/api/v1/request/")
             .post().type(RequestDto.class)
             .route()
-            .setExchangePattern(ExchangePattern.InOnly)
             .log(LoggingLevel.INFO, LOGGER, "Recived a request message")
             .process(exchange -> exchange.getIn().setHeader("resource", UUID.randomUUID().toString()))
             .log(LoggingLevel.INFO, LOGGER, "Created resource")
-            .to("activemq:queue:" + requestQ + "?jmsMessageType=Text")
+            .to("activemq:queue:" + requestQ + "?jmsMessageType=Text&disableReplyTo=true")
             .setHeader(HttpHeaders.LOCATION, simple("/api/v1/request/${header.resource}"))
             .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(201))
             .setBody(ResponseDto::new);

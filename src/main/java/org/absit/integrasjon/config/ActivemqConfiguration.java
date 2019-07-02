@@ -9,13 +9,15 @@ import org.apache.activemq.camel.component.ActiveMQComponent;
 import org.apache.activemq.pool.PooledConnectionFactory;
 import org.apache.camel.LoggingLevel;
 import org.apache.camel.component.jms.JmsConfiguration;
-import org.apache.camel.spring.spi.TransactionErrorHandlerBuilder;
+import org.apache.camel.spring.spi.SpringTransactionPolicy;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.data.transaction.ChainedTransactionManager;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jms.connection.JmsTransactionManager;
-import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Configuration
 public class ActivemqConfiguration {
@@ -61,18 +63,18 @@ public class ActivemqConfiguration {
 
     @Bean
     @Inject
-    public PlatformTransactionManager jmsTransactionManager(PooledConnectionFactory pooledConnectionFactory) {
+    public JmsTransactionManager jmsTransactionManager(PooledConnectionFactory pooledConnectionFactory) {
         return new JmsTransactionManager(pooledConnectionFactory);
     }
 
-    @Bean
-    @Inject
-    public TransactionErrorHandlerBuilder transactionErrorHandlerBuilder(
-        PlatformTransactionManager jmsTransactionManager) {
-        TransactionErrorHandlerBuilder transactionErrorHandlerBuilder = new TransactionErrorHandlerBuilder();
-        transactionErrorHandlerBuilder.setTransactionManager(jmsTransactionManager);
-        return transactionErrorHandlerBuilder;
-    }
+//    @Bean
+//    @Inject
+//    public TransactionErrorHandlerBuilder transactionErrorHandlerBuilder(
+//        JmsTransactionManager jmsTransactionManager) {
+//        TransactionErrorHandlerBuilder transactionErrorHandlerBuilder = new TransactionErrorHandlerBuilder();
+//        transactionErrorHandlerBuilder.setTransactionManager(jmsTransactionManager);
+//        return transactionErrorHandlerBuilder;
+//    }
 
     @Bean(initMethod = "start", destroyMethod = "stop")
     PooledConnectionFactory pooledConnectionFactory(ActiveMQConnectionFactory activeMQConnectionFactory) {
@@ -123,10 +125,27 @@ public class ActivemqConfiguration {
         return jmsConfig;
     }
 
+
+    @Bean
+    public SpringTransactionPolicy PROPAGATION_REQUIRED(TransactionTemplate transactionManager) {
+        return new SpringTransactionPolicy(transactionManager);
+    }
+
     @Bean
     @Inject
-    public ActiveMQComponent activemq(PooledConnectionFactory pooledConnectionFactory,JmsConfiguration jmsConfiguration,
-        PlatformTransactionManager jmsTransactionManager) {
+    public ChainedTransactionManager transactionManager(JmsTransactionManager jmsTransactionManager, DataSourceTransactionManager dataSourceTransactionManager) {
+        return new ChainedTransactionManager(jmsTransactionManager, dataSourceTransactionManager);
+    }
+
+    @Bean
+    @Inject
+    public TransactionTemplate transactionTemplate(ChainedTransactionManager transactionManager) {
+        return new TransactionTemplate(transactionManager);
+    }
+
+    @Bean
+    @Inject
+    public ActiveMQComponent activemq(JmsConfiguration jmsConfiguration, JmsTransactionManager jmsTransactionManager) {
         ActiveMQComponent aqComponent = new ActiveMQComponent();
         aqComponent.setConfiguration(jmsConfiguration);
         aqComponent.setTransactionManager(jmsTransactionManager);

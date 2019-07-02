@@ -30,10 +30,14 @@ public class JmsRoutes extends RouteBuilder {
     @Override
     public void configure() {
         from("activemq:queue:" + requestQ + "?jmsMessageType=Text").routeId("JmsRoutes")
+            .transacted()
             .log(LoggingLevel.INFO, LOGGER, "Recived JMS message from " + requestQ)
             .bean(requestRepository)
             .log(LoggingLevel.INFO, LOGGER, "Stored JMS request message to DB")
             .bean(dataRepository)
-            .log(LoggingLevel.INFO, LOGGER, "Stored DATA to DB");
+            .log(LoggingLevel.INFO, LOGGER, "Stored DATA to DB")
+            .process(exchange -> {
+                throw new IllegalArgumentException("Some exception");
+            });
     }
 }
