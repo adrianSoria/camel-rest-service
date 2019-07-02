@@ -6,10 +6,17 @@ import static io.restassured.RestAssured.given;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Map;
 
 import javax.ws.rs.core.HttpHeaders;
 
 import org.absit.integrasjon.camel.ApiRoutes;
+import org.apache.activemq.broker.Broker;
+import org.apache.activemq.broker.BrokerRegistry;
+import org.apache.activemq.broker.BrokerService;
+import org.apache.activemq.broker.region.Destination;
+import org.apache.activemq.broker.region.Queue;
+import org.apache.activemq.command.ActiveMQDestination;
 import org.apache.commons.io.FileUtils;
 import org.junit.Before;
 import org.junit.Test;
@@ -35,7 +42,8 @@ public class IntegrationTest {
     private String serviceUrl;
 
     @Before
-    public void createTestSetup() {
+    public void createTestSetup() throws Exception {
+        cleanQueues(getEmbeddedBroker());
         serviceUrl = "http://localhost:" + randomServerPort + "/api/v1/request/";
     }
 
@@ -73,5 +81,27 @@ public class IntegrationTest {
             LOGGER.warn("Error when reading file " + e.getMessage());
         }
         return null;
+    }
+
+    private Broker getEmbeddedBroker() throws Exception {
+        Map<String,BrokerService> brokers = BrokerRegistry.getInstance().getBrokers();
+        BrokerService brokerService = brokers.get("embedded");
+        return brokerService.getBroker();
+    }
+
+    public void cleanQueues(Broker broker) throws Exception {
+        Map<ActiveMQDestination, Destination> destinationMap
+            = broker.getDestinationMap();
+        for (Destination destination : destinationMap.values()) {
+            ActiveMQDestination activeMQDestination
+                = destination.getActiveMQDestination();
+            if (activeMQDestination.isQueue()) {
+                cleanQueue((Queue) destination);
+            }
+        }
+    }
+
+    private void cleanQueue(Queue queue) throws Exception {
+        queue.purge();
     }
 }
